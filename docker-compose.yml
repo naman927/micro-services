@@ -1,0 +1,35 @@
+version: "3.8"
+
+volumes: 
+  mongodata:
+
+services:
+  scapper:
+    build:
+      context: ./scapper
+      dockerfile: Dockerfile
+    image: scapper
+    ports:
+      - "8080:8080"
+    expose:
+      - 8080
+    container_name: Scapper
+  
+  store:
+    build:
+      context: ./store
+      dockerfile: Dockerfile
+    image: store
+    ports:
+      - "8081:8081"
+    container_name: store
+  
+  database:
+    image: mongo:4.4.2
+    ports:
+      - "27017:27017"
+    container_name: MongoDB
+    volumes:
+      - type: volume
+        source: mongodata
+        target: /data/db
