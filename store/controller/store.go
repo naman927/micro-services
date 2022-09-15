@@ -32,7 +32,6 @@ func APIUpsertProduct(c *gin.Context) {
 		return
 	}
 
-	fmt.Println("updated", updated)
 	switch updated {
 	default:
 		c.JSON(http.StatusInternalServerError, map[string]interface{}{
@@ -49,7 +48,7 @@ func APIUpsertProduct(c *gin.Context) {
 		})
 		return
 	case 0:
-		c.JSON(http.StatusOK, map[string]interface{}{
+		c.JSON(http.StatusCreated, map[string]interface{}{
 			"error":   nil,
 			"message": "inserted",
 			"data":    nil,
