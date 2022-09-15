@@ -20,9 +20,10 @@ type Product struct {
 }
 
 type ProductModel struct {
-	ID        primitive.ObjectID `json:"_id" bson:"_id"`
-	URL       string             `json:"url" bson:"url"`
-	Product   Product            `json:"product" bson:"product"`
-	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
-	UpdatedAt time.Time          `json:"updated_At" bson:"updated_at"`
+	ID        primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
+	URL       string             `json:"url,omitempty" bson:"url,omitempty"`
+	Product   Product            `json:"product,omitempty" bson:"product,omitempty"`
+	CreatedAt time.Time          `json:"created_at,omitempty" bson:"created_at,omitempty"`
+	UpdatedAt time.Time          `json:"updated_At,omitempty" bson:"updated_at,omitempty"`
 }
+
