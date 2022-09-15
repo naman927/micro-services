@@ -9,7 +9,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gocolly/colly"
@@ -61,12 +60,12 @@ func ScapWeb(c *gin.Context) {
 	}
 
 	scapper := colly.NewCollector()
-	scapper.SetRequestTimeout(200 * time.Second)
 
-	p := Product{}
-	scapper.OnHTML("div#dp-container", func(e *colly.HTMLElement) {
+	p := &Product{}
+
+	scapper.OnHTML("body", func(e *colly.HTMLElement) {
 		p.ImageUrl = e.ChildAttr("img", "src")
-		p.Title = e.ChildText("span#productTitle")
+		p.Title = e.ChildText("title")
 		e.ForEach("ul.a-unordered-list.a-vertical.a-spacing-mini > li > span.a-list-item", func(i int, h *colly.HTMLElement) {
 			p.Description += h.Text
 		})
@@ -74,6 +73,58 @@ func ScapWeb(c *gin.Context) {
 		p.Price, err = strconv.ParseFloat(strings.Split(e.ChildText("span[aria-hidden='true'] > span.a-price-whole"), ".")[0], 64)
 		if err != nil {
 			fmt.Println("error while fetching prize, so setting it to zero", err)
+		}
+		fmt.Println(p)
+	})
+
+	scapper.OnScraped(func(r *colly.Response) {
+		fmt.Println("Finished", r.Request.URL)
+		serviceReq := map[string]interface{}{
+			"url":     req.Url,
+			"product": p,
+		}
+		reqForStore, err := json.Marshal(serviceReq)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, map[string]interface{}{
+				"error":   err.Error(),
+				"message": "something went wrong",
+				"data":    nil,
+			})
+			return
+		}
+
+		storeURL := fmt.Sprintf("http://%s:%s/%s", os.Getenv("SERVICE_URL"), os.Getenv("SERVICE_PORT"), os.Getenv("WRITE_SERVICE"))
+		reqObj, err := http.NewRequest("POST", storeURL, bytes.NewBuffer(reqForStore))
+		reqObj.Header.Set("content-type", "application/json")
+
+		client := &http.Client{}
+		response, err := client.Do(reqObj)
+		if err != nil {
+			panic(err)
+		}
+		defer response.Body.Close()
+
+		if response.StatusCode == http.StatusCreated {
+			c.JSON(http.StatusOK, map[string]interface{}{
+				"error":   nil,
+				"message": "url added succefully!",
+				"data":    p,
+			})
+			return
+		} else if response.StatusCode == http.StatusAccepted {
+			c.JSON(http.StatusOK, map[string]interface{}{
+				"error":   nil,
+				"message": "url updated succefully!",
+				"data":    p,
+			})
+			return
+		} else {
+			c.JSON(http.StatusInternalServerError, map[string]interface{}{
+				"error":   "something went wrong with store",
+				"message": "something went wrong with store",
+				"data":    nil,
+			})
+			return
 		}
 	})
 
@@ -85,56 +136,9 @@ func ScapWeb(c *gin.Context) {
 		fmt.Println("Got this error:", e)
 	})
 
+	scapper.OnResponse(func(r *colly.Response) {
+		fmt.Println("Got a response from", r.Request.URL)
+	})
+
 	scapper.Visit(req.Url)
-
-	scapper.Wait()
-
-	serviceReq := map[string]interface{}{
-		"url":     req.Url,
-		"product": p,
-	}
-
-	reqForStore, err := json.Marshal(serviceReq)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, map[string]interface{}{
-			"error":   err.Error(),
-			"message": "something went wrong",
-			"data":    nil,
-		})
-		return
-	}
-
-	storeURL := fmt.Sprintf("http://%s:%s/%s", os.Getenv("SERVICE_URL"), os.Getenv("SERVICE_PORT"), os.Getenv("WRITE_SERVICE"))
-	reqObj, err := http.NewRequest("POST", storeURL, bytes.NewBuffer(reqForStore))
-	reqObj.Header.Set("content-type", "application/json")
-
-	client := &http.Client{}
-	response, err := client.Do(reqObj)
-	if err != nil {
-		panic(err)
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode == http.StatusCreated {
-		c.JSON(http.StatusOK, map[string]interface{}{
-			"error":   nil,
-			"message": "url added succefully!",
-			"data":    p,
-		})
-		return
-	} else if response.StatusCode == http.StatusAccepted {
-		c.JSON(http.StatusOK, map[string]interface{}{
-			"error":   nil,
-			"message": "url updated succefully!",
-			"data":    p,
-		})
-		return
-	} else {
-		c.JSON(http.StatusInternalServerError, map[string]interface{}{
-			"error":   "something went wrong with store",
-			"message": "something went wrong with store",
-			"data":    nil,
-		})
-		return
-	}
 }
